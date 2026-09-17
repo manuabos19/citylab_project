@@ -18,11 +18,11 @@ public:
     auto qos = rclcpp::QoS(10).reliability(rclcpp::ReliabilityPolicy::Reliable);
 
     subscriber_scan_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
-        "/fastbot_1/scan", qos,
+        "/scan", qos,
         std::bind(&Patrol::laserscan_callback, this, std::placeholders::_1));
 
-    publisher_cmd_vel_ = this->create_publisher<geometry_msgs::msg::Twist>(
-        "/fastbot_1/cmd_vel", 10);
+    publisher_cmd_vel_ =
+        this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
 
     auto timer_period = std::chrono::milliseconds(100);
     timer_ = this->create_wall_timer(timer_period,
@@ -48,8 +48,8 @@ private:
   float lado_ = 0.0;
 
   // umbrales
-  const float DISTANCIA_GIRO_ = 0.35;
-  const float DISTANCIA_LIBRE_ = 0.50;
+  const float DISTANCIA_GIRO_ = 0.45;
+  const float DISTANCIA_LIBRE_ = 0.60;
 
   void timer_callback() {
     auto cmd_vel = geometry_msgs::msg::Twist();
