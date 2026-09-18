@@ -48,7 +48,7 @@ private:
   float lado_ = 0.0;
 
   // umbrales
-  const float DISTANCIA_GIRO_ = 0.45;
+  const float DISTANCIA_GIRO_ = 0.35;
   const float DISTANCIA_LIBRE_ = 0.60;
 
   void timer_callback() {
