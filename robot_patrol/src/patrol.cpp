@@ -48,7 +48,7 @@ private:
   float lado_ = 0.0;
 
   // umbrales
-  const float DISTANCIA_GIRO_ = 0.35;
+  const float DISTANCIA_GIRO_ = 0.45;
   const float DISTANCIA_LIBRE_ = 0.60;
 
   void timer_callback() {
@@ -56,7 +56,7 @@ private:
 
     if (girando_) {
       cmd_vel.angular.z = lado_;
-      cmd_vel.linear.x = 0.05;
+      cmd_vel.linear.x = 0.01;
       RCLCPP_WARN(this->get_logger(), "Girando %s",
                   (lado_ > 0) ? "izquierda" : "derecha");
     } else {
