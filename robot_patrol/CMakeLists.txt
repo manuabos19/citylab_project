@@ -12,6 +12,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
 
 
 add_executable(patrol_executable src/patrol.cpp)
@@ -26,6 +27,12 @@ install(TARGETS
 # Install launch files
 install(DIRECTORY launch rviz
   DESTINATION share/${PROJECT_NAME}/)
+
+# generacion interfaces
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "srv/GetDirection.srv"
+  DEPENDENCIES sensor_msgs
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
