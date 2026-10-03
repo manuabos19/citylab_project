@@ -1,32 +1,46 @@
 #include "geometry_msgs/msg/twist.hpp"
-#include "rclcpp/logging.hpp"
-#include "rclcpp/node.hpp"
 #include "rclcpp/rclcpp.hpp"
-#include "sensor_msgs/msg/detail/laser_scan__struct.hpp"
+#include "robot_patrol/srv/get_direction.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include <chrono>
-#include <cmath>
-#include <string>
-#include <vector>
 
-class Patrol : public rclcpp::Node {
+using namespace std::chrono_literals;
+
+class PatrolWithService : public rclcpp::Node {
 public:
-  Patrol(const std::string &node_name = "patrol")
-      : Node(node_name), node_name_(node_name) {
+  PatrolWithService(const std::string &node_name = "patrol_with_service")
+      : Node(node_name) {
 
-    // QoS settings
     auto qos = rclcpp::QoS(10).reliability(rclcpp::ReliabilityPolicy::Reliable);
 
-    subscriber_scan_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
+    // service client
+    std::string name_service = "/direction_service";
+    client_ =
+        this->create_client<robot_patrol::srv::GetDirection>(name_service);
+
+    while (!client_->wait_for_service(1s)) {
+
+      if (!rclcpp::ok()) {
+        RCLCPP_ERROR(this->get_logger(),
+                     "Interrupted while waiting for the Service");
+
+        return;
+      }
+
+      RCLCPP_INFO(this->get_logger(),
+                  "Service not available, waiting again...");
+    }
+
+    subscriber_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
         "/fastbot_1/scan", qos,
-        std::bind(&Patrol::laserscan_callback, this, std::placeholders::_1));
+        std::bind(&PatrolWithService::laserscan_callback, this,
+                  std::placeholders::_1));
 
     publisher_cmd_vel_ = this->create_publisher<geometry_msgs::msg::Twist>(
         "/fastbot_1/cmd_vel", 10);
 
-    auto timer_period = std::chrono::milliseconds(100);
-    timer_ = this->create_wall_timer(timer_period,
-                                     std::bind(&Patrol::timer_callback, this));
+    timer_ = this->create_wall_timer(
+        100ms, std::bind(&PatrolWithService::timer_callback, this));
 
     // iniciamos movimiento hacia delante
     auto msg = geometry_msgs::msg::Twist();
@@ -37,126 +51,74 @@ public:
   }
 
 private:
-  std::string node_name_;
-  rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr subscriber_scan_;
-  rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr publisher_cmd_vel_;
+  rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr subscriber_;
   rclcpp::TimerBase::SharedPtr timer_;
-
-  // inicializamos todo lo necesario
-  bool hayObstaculos_ = false;
-  bool girando_ = false;
-  float lado_ = 0.0;
-
-  // umbrales
-  const float DISTANCIA_GIRO_ = 0.35;
-  const float DISTANCIA_LIBRE_ = 0.50;
-
-  void timer_callback() {
-    auto cmd_vel = geometry_msgs::msg::Twist();
-
-    if (girando_) {
-      cmd_vel.angular.z = lado_;
-      cmd_vel.linear.x = 0.05;
-      RCLCPP_WARN(this->get_logger(), "Girando %s",
-                  (lado_ > 0) ? "izquierda" : "derecha");
-    } else {
-      cmd_vel.angular.z = 0.0;
-      cmd_vel.linear.x = 0.1;
-      RCLCPP_INFO(this->get_logger(), "Sigue de frente");
-    }
-
-    publisher_cmd_vel_->publish(cmd_vel);
-  }
+  rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr publisher_cmd_vel_;
+  sensor_msgs::msg::LaserScan::SharedPtr laser_scan_;
+  rclcpp::Client<robot_patrol::srv::GetDirection>::SharedPtr client_;
+  std::string direction_;
 
   void laserscan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
 
-    hayObstaculos_ = false;
-
-    // obtenemos los indice del angulo 90  y 270. Tambien obtendremos los
-    // indices de 20 y 340 para la deteccion de obstaculos
-    int i_90 = angle_to_index(msg->angle_min, msg->angle_increment, 90);
-    int i_270 = angle_to_index(msg->angle_min, msg->angle_increment, 270);
-    int i_20 = angle_to_index(msg->angle_min, msg->angle_increment, 20);
-    int i_340 = angle_to_index(msg->angle_min, msg->angle_increment, 340);
-
-    std::vector<float> sector_180;
-    std::vector<float> sector_obstaculos;
-
-    // añadimos a los vectores las lecturas de los laseres. 20º y 180º
-    sector_180.insert(sector_180.end(), msg->ranges.begin(),
-                      msg->ranges.begin() + (i_90 + 1));
-
-    sector_180.insert(sector_180.end(), msg->ranges.begin() + i_270,
-                      msg->ranges.end());
-
-    sector_obstaculos.insert(sector_obstaculos.end(), msg->ranges.begin(),
-                             msg->ranges.begin() + (i_20 + 1));
-
-    sector_obstaculos.insert(sector_obstaculos.end(),
-                             msg->ranges.begin() + i_340, msg->ranges.end());
-
-    float min_distancia_obstaculos = std::numeric_limits<float>::infinity();
-
-    // distancia minima del sector de obstaculos (±20º)
-    // aqui si ignoramos inf: inf = no hay obstaculo
-    for (float distancia : sector_obstaculos) {
-      if (std::isnan(distancia) || std::isinf(distancia))
-        continue;
-
-      if (distancia < min_distancia_obstaculos) {
-        min_distancia_obstaculos = distancia;
-      }
-    }
-
-    // maximo de los 180º para ver donde girar
-    float max_distancia_obstaculos = 0.0;
-    int indice_laser_maxima_distancia = 0;
-    for (size_t i = 0; i < sector_180.size(); ++i) {
-      if (std::isnan(sector_180[i]) || std::isinf(sector_180[i]))
-        continue;
-
-      if (sector_180[i] > max_distancia_obstaculos) {
-        max_distancia_obstaculos = sector_180[i];
-        indice_laser_maxima_distancia = i;
-      }
-    }
-
-    int mitad_indice = sector_180.size() / 2;
-
-    // el lado solo se decide mientras NO giramos; al girar queda bloqueado
-    if (girando_ == false) {
-      if (indice_laser_maxima_distancia > mitad_indice) {
-        lado_ = -0.5;
-      } else {
-        lado_ = 0.5;
-      }
-    }
-
-    if (min_distancia_obstaculos <= DISTANCIA_GIRO_) {
-      if (!girando_) {
-        RCLCPP_ERROR(this->get_logger(), "ALERTA: CERCA DE OBSTACULO O PARED");
-      }
-      hayObstaculos_ = true;
-      girando_ = true;
-    }
-
-    if (min_distancia_obstaculos > DISTANCIA_LIBRE_) {
-      girando_ = false;
-    }
+    laser_scan_ = msg;
   }
 
-  // convertimos de angulo a indices, previamente convertimos a radianes
-  int angle_to_index(float angle_min, float angle_increment, float angle) {
+  void send_request() {
 
-    float rad = angle * M_PI / 180.0f;
+    auto request = std::make_shared<robot_patrol::srv::GetDirection::Request>();
 
-    return static_cast<int>(std::round((rad - angle_min) / angle_increment));
+    request->laser_data = *laser_scan_;
+
+    // hacemos que la peticion sea asincrona para no bloquear el hilo principal
+    client_->async_send_request(request,
+                                std::bind(&PatrolWithService::response_callback,
+                                          this, std::placeholders::_1));
+
+    RCLCPP_INFO(this->get_logger(), "Request Sent");
+  }
+
+  // recibimos la respuesta del server
+  void response_callback(
+      rclcpp::Client<robot_patrol::srv::GetDirection>::SharedFuture future) {
+
+    auto response = future.get();
+
+    RCLCPP_INFO(this->get_logger(), "Response Received: %s",
+                response->direction.c_str());
+
+    direction_ = response->direction;
+  }
+
+  void timer_callback() {
+
+    if (!laser_scan_) {
+      return;
+    }
+    auto msg = geometry_msgs::msg::Twist();
+
+    if (direction_ == "forward") {
+      msg.linear.x = 0.1;
+      msg.angular.z = 0.0;
+    } else if (direction_ == "left") {
+      msg.linear.x = 0.1;
+      msg.angular.z = 0.5;
+    } else if (direction_ == "right") {
+      msg.linear.x = 0.1;
+      msg.angular.z = -0.5;
+    } else {
+      msg.linear.x = 0.1;
+      msg.angular.z = 0.0;
+    }
+
+    publisher_cmd_vel_->publish(msg);
+
+    send_request();
   }
 };
 
 int main(int argc, char **argv) {
   rclcpp::init(argc, argv);
-  auto node = std::make_shared<Patrol>();
+  auto node = std::make_shared<PatrolWithService>();
   rclcpp::spin(node);
   rclcpp::shutdown();
   return 0;

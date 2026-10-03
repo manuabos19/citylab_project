@@ -26,11 +26,15 @@ ament_target_dependencies(direction_service_executable rclcpp sensor_msgs)
 add_executable(test_service_executable src/test_service.cpp)
 ament_target_dependencies(test_service_executable rclcpp sensor_msgs)
 
+add_executable(patrol_with_service_executable src/patrol_with_service.cpp)
+ament_target_dependencies(patrol_with_service_executable rclcpp sensor_msgs geometry_msgs)
+
 
 install(TARGETS
   patrol_executable
   direction_service_executable
   test_service_executable
+  patrol_with_service_executable
   DESTINATION lib/${PROJECT_NAME})
 
   
@@ -49,6 +53,7 @@ rosidl_get_typesupport_target(cpp_typesupport_target
 
 target_link_libraries(direction_service_executable "${cpp_typesupport_target}")
 target_link_libraries(test_service_executable "${cpp_typesupport_target}")
+target_link_libraries(patrol_with_service_executable "${cpp_typesupport_target}")
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
