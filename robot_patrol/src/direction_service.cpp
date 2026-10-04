@@ -18,9 +18,12 @@ public:
 
 private:
   rclcpp::Service<robot_patrol::srv::GetDirection>::SharedPtr service_;
+  bool girando_ = false;
+  std::string lado_ = "";
 
   // umbrales
   const float DISTANCIA_GIRO_ = 0.35;
+  const float DISTANCIA_LIBRE_ = 0.50;
 
   void get_direction_request(
       const std::shared_ptr<robot_patrol::srv::GetDirection::Request> request,
@@ -80,14 +83,25 @@ private:
       total_dist_sec_front = total_dist_sec_front + distancia;
     }
 
+    if (girando_ == true) {
+      if (min_distancia_frontal_obstaculos < DISTANCIA_LIBRE_) {
+        response->direction = lado_;
+        return;
+      }
+    }
+
     // verificamos si la distancia del sector frontal es superior al umbral
     // minimo para evaluar el giro
     if (min_distancia_frontal_obstaculos > DISTANCIA_GIRO_) {
       RCLCPP_INFO(this->get_logger(), "Request Completed...");
       RCLCPP_INFO(this->get_logger(), "Response: forward");
       response->direction = "forward";
+      lado_ = "";
+      girando_ = false;
       return;
     }
+
+    girando_ = true;
 
     // sumamos las distancias del sector izquierdo y derecho
     float total_dist_sec_right = 0.0;
@@ -119,9 +133,11 @@ private:
     if (total_dist_sec_left > total_dist_sec_right) {
       RCLCPP_INFO(this->get_logger(), "Response: left");
       response->direction = "left";
+      lado_ = "left";
     } else {
       RCLCPP_INFO(this->get_logger(), "Response: right");
       response->direction = "right";
+      lado_ = "right";
     }
   }
 

@@ -48,6 +48,9 @@ public:
     msg.angular.z = 0.0;
 
     publisher_cmd_vel_->publish(msg);
+
+    RCLCPP_INFO(this->get_logger(), "%s Patrol with service Ready...",
+                name_service.c_str());
   }
 
 private:
