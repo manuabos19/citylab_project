@@ -17,7 +17,7 @@ public:
         this->create_client<robot_patrol::srv::GetDirection>(name_service);
 
     subscriber_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
-        "/fastbot_1/scan", qos,
+        "/scan", qos,
         std::bind(&TestService::laserscan_callback, this,
                   std::placeholders::_1));
 

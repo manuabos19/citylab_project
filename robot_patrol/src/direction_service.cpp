@@ -22,8 +22,8 @@ private:
   std::string lado_ = "";
 
   // umbrales
-  const float DISTANCIA_GIRO_ = 0.35;
-  const float DISTANCIA_LIBRE_ = 0.50;
+  const float DISTANCIA_GIRO_ = 0.45;
+  const float DISTANCIA_LIBRE_ = 0.60;
 
   void get_direction_request(
       const std::shared_ptr<robot_patrol::srv::GetDirection::Request> request,

@@ -32,12 +32,12 @@ public:
     }
 
     subscriber_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
-        "/fastbot_1/scan", qos,
+        "/scan", qos,
         std::bind(&PatrolWithService::laserscan_callback, this,
                   std::placeholders::_1));
 
-    publisher_cmd_vel_ = this->create_publisher<geometry_msgs::msg::Twist>(
-        "/fastbot_1/cmd_vel", 10);
+    publisher_cmd_vel_ =
+        this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
 
     timer_ = this->create_wall_timer(
         100ms, std::bind(&PatrolWithService::timer_callback, this));
