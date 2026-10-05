@@ -8,10 +8,12 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_action REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(tf2 REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
 
@@ -30,11 +32,16 @@ add_executable(patrol_with_service_executable src/patrol_with_service.cpp)
 ament_target_dependencies(patrol_with_service_executable rclcpp sensor_msgs geometry_msgs)
 
 
+add_executable(go_to_pose_executable src/go_to_pose_action.cpp)
+ament_target_dependencies(go_to_pose_executable rclcpp   rclcpp_action sensor_msgs nav_msgs tf2 geometry_msgs)
+
+
 install(TARGETS
   patrol_executable
   direction_service_executable
   test_service_executable
   patrol_with_service_executable
+  go_to_pose_executable
   DESTINATION lib/${PROJECT_NAME})
 
   
@@ -45,8 +52,11 @@ install(DIRECTORY launch rviz
 # generacion interfaces
 rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/GetDirection.srv"
-  DEPENDENCIES sensor_msgs
+  "action/GoToPose.action"
+  DEPENDENCIES sensor_msgs geometry_msgs
 )
+
+
 
 rosidl_get_typesupport_target(cpp_typesupport_target
   ${PROJECT_NAME} "rosidl_typesupport_cpp")
@@ -54,6 +64,7 @@ rosidl_get_typesupport_target(cpp_typesupport_target
 target_link_libraries(direction_service_executable "${cpp_typesupport_target}")
 target_link_libraries(test_service_executable "${cpp_typesupport_target}")
 target_link_libraries(patrol_with_service_executable "${cpp_typesupport_target}")
+target_link_libraries(go_to_pose_executable "${cpp_typesupport_target}")
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
